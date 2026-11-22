@@ -1,0 +1,11 @@
+{
+  "name": "prism-tile",
+  "private": true,
+  "description": "Prism, a dice puzzle web tile whose rules run as a WebAssembly engine any host can use to check a game.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "build-engine": "node scripts/build-engine.mjs",
+    "check-engine": "node scripts/build-engine.mjs --check"
+  }
+}
