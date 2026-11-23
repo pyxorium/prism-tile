@@ -95,7 +95,7 @@ def play_to_end(g, page, illegal_try=True):
 
 try:
     with sync_playwright() as p:
-        b = p.chromium.launch()
+        b = p.chromium.launch(args=["--use-gl=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"])
         errors, outside = [], []
         def watch(pg):
             pg.on("pageerror", lambda e: errors.append(str(e)))
@@ -244,6 +244,103 @@ try:
         check("no one signed in: the game says guest", True)
         play_to_end(g2, page2, illegal_try=False)
         check("a host that doesn't save Prism: no Save, and the note says so", not g2.locator("#saveBtn").is_visible() and g2.locator("#saveNote").is_visible())
+
+
+        # 5. Looks and celebrations.
+        # A known free-play game (seed 2): a rainbow row on the 9th placement, a full board on the 12th.
+        KNOWN = [[0,11],[1,10],[1,5],[0,2],[1,0],[0,7],[0,8],[0,1],[3,9],[0,3],[0,6],[1,4]]
+        def play_known(pg):
+            pg.locator("#freeBtn").click(); pg.locator("#castBtn").click(); pg.wait_for_timeout(1300)
+            for n, (die, cell) in enumerate(KNOWN, 1):
+                pg.locator(f'#tray .die[data-die="{die}"]').click()
+                pg.locator(f'.cell.lit[data-cell="{cell}"]').click()
+                if n == 9:
+                    tag9 = pg.locator(".bonusTag").first
+                    tag9.wait_for(timeout=2000)
+                    check("a rainbow row celebrates: 'Rainbow bonus +3', with the spectrum flare", "Rainbow bonus +3" in tag9.text_content() and pg.locator(".flare").count() >= 1)
+                    pg.wait_for_timeout(1900)
+            return pg
+        for look_name in ("classic", "prism", "retro"):
+            pg = b.new_page(viewport={"width": 380, "height": 460})
+            watch(pg)
+            pg.goto(f"{BASE}/tile/index.html?seed=2&look={look_name}")
+            pg.locator("#castBtn").wait_for(timeout=8000)
+            check(f"{look_name}: the look menu offers Classic, Prism light and Retro CRT, set to {look_name}",
+                  pg.locator("#lookSel option").all_text_contents() == ["Classic", "Prism light", "Retro CRT"] and pg.evaluate("document.documentElement.dataset.look") == look_name)
+            ov = cast_overlap(pg, 3)
+            check(f"{look_name}: the pool's dice never touch while they're cast", ov == 0, f"worst overlap {ov:.1f}px")
+            pg.goto(f"{BASE}/tile/index.html?seed=2&look={look_name}"); pg.locator("#castBtn").wait_for(timeout=8000)
+            play_known(pg)
+            pg.locator(".bonusTag").filter(has_text="Full board!").wait_for(timeout=3000)
+            check(f"{look_name}: a full board celebrates ('Full board!', every row flared), and the end screen waits for it",
+                  pg.locator("#endPanel").is_hidden() and pg.locator(".flare").count() >= 1)
+            pg.screenshot(path=os.path.join(SHOTS, f"look-{look_name}-fullboard.png"))
+            pg.locator("#endPanel").wait_for(state="visible", timeout=4000)
+            check(f"{look_name}: then the end screen shows the score (15)", pg.locator("#endScore").text_content() == "15", pg.locator("#endScore").text_content())
+            pg.screenshot(path=os.path.join(SHOTS, f"look-{look_name}-end.png"))
+            pg.locator("#againBtn").click(); pg.locator("#castBtn").click(); pg.wait_for_timeout(1300)
+            pg.locator('#tray .die[data-die="0"]').click()
+            pg.screenshot(path=os.path.join(SHOTS, f"look-{look_name}-play.png"))
+            pg.close()
+
+        # Prism light: the spectrum draws, turns slowly, stops when another look is chosen.
+        pg = b.new_page(viewport={"width": 380, "height": 460}); watch(pg)
+        pg.goto(f"{BASE}/tile/index.html"); pg.locator("#castBtn").wait_for(timeout=8000)
+        check("Classic is the look when nothing was chosen before", pg.evaluate("document.documentElement.dataset.look") == "classic" and not pg.evaluate("window.__prismLook.running"))
+        pg.select_option("#lookSel", "prism"); pg.wait_for_timeout(400)
+        gl = pg.evaluate("!document.documentElement.classList.contains('no-gl')")
+        h1 = pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--hue')"); t1 = pg.evaluate("window.__prismLook.time")
+        pg.wait_for_timeout(1600)
+        h2 = pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--hue')"); t2 = pg.evaluate("window.__prismLook.time")
+        check("Prism light: the spectrum is drawn with WebGL and its colors turn (slowly)", gl and pg.evaluate("window.__prismLook.running") and t2 > t1 and h1 != h2, (gl, h1, h2))
+        import io
+        from PIL import Image
+        corner = Image.open(io.BytesIO(pg.screenshot(clip={"x": 0, "y": 380, "width": 40, "height": 40}))).convert("RGB")
+        avg = [sum(c) / len(c) for c in zip(*corner.getdata())]
+        check("Prism light: the tile's corner has spectrum color in it (not the plain dark of Classic)", sum(avg) > 40, [round(v) for v in avg])
+        pg.locator("#castBtn").click(); pg.wait_for_timeout(1300)
+        check("Prism light: the dice get their glass rainbow rims", pg.evaluate("getComputedStyle(document.querySelector('#tray .die'), '::before').content") == '""')
+        pg.select_option("#lookSel", "classic"); pg.wait_for_timeout(300)
+        check("back to Classic: no rims on the dice", pg.evaluate("getComputedStyle(document.querySelector('#tray .die'), '::before').content") == "none")
+        check("back to Classic: the spectrum stops drawing", not pg.evaluate("window.__prismLook.running") and pg.evaluate("getComputedStyle(document.getElementById('bg')).display") == "none")
+        pg.select_option("#lookSel", "retro"); pg.wait_for_timeout(500)
+        check("Retro CRT: the scanline screen is on, and the pixel font is loaded",
+              pg.evaluate("getComputedStyle(document.getElementById('crt')).display") == "block" and pg.evaluate("document.fonts.check('12px Silkscreen')")
+              and "Silkscreen" in pg.evaluate("getComputedStyle(document.querySelector('.title')).fontFamily"))
+        pg.reload(); pg.locator("#castBtn").wait_for(timeout=8000)
+        check("the chosen look is remembered where the page can remember it (here: Retro CRT after a reload)", pg.evaluate("document.documentElement.dataset.look") == "retro")
+        pg.close()
+
+        # Without WebGL: Prism light falls back to soft CSS color.
+        pg = b.new_page(viewport={"width": 380, "height": 460}); watch(pg)
+        pg.add_init_script("HTMLCanvasElement.prototype.getContext = function () { return null; };")
+        pg.goto(f"{BASE}/tile/index.html?look=prism"); pg.locator("#castBtn").wait_for(timeout=8000); pg.wait_for_timeout(300)
+        check("without WebGL, Prism light shows its soft color fallback instead", pg.evaluate("document.documentElement.classList.contains('no-gl')") and pg.evaluate("getComputedStyle(document.getElementById('bgSoft')).display") == "block")
+        pg.screenshot(path=os.path.join(SHOTS, "look-prism-no-webgl.png"))
+        pg.close()
+
+        # Reduced motion: nothing moves on its own.
+        ctx = b.new_context(viewport={"width": 380, "height": 460}, reduced_motion="reduce")
+        pg = ctx.new_page(); watch(pg)
+        pg.goto(f"{BASE}/tile/index.html?seed=2&look=prism"); pg.locator("#castBtn").wait_for(timeout=8000); pg.wait_for_timeout(400)
+        h1 = pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--hue')"); pg.wait_for_timeout(1500)
+        h2 = pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--hue')")
+        check("reduced motion: Prism light's colors hold still", h1 == h2 and not pg.evaluate("window.__prismLook.running"), (h1, h2))
+        play_known(pg)
+        check("reduced motion: the celebrations keep their words but not the flares", pg.evaluate("getComputedStyle(document.querySelector('.bonusTag') || document.body).animationName") in ("tagStill", "none"))
+        pg.select_option("#lookSel", "retro")
+        check("reduced motion: Retro CRT's screen doesn't flicker or roll", pg.evaluate("getComputedStyle(document.getElementById('crt')).animationName") == "none")
+        ctx.close()
+
+        # The phone, each look.
+        for look_name in ("prism", "retro"):
+            pg = b.new_page(viewport={"width": 390, "height": 844}); watch(pg)
+            pg.goto(f"{BASE}/tile/index.html?look={look_name}"); pg.locator("#castBtn").click(); pg.wait_for_timeout(1300)
+            pg.locator('#tray .die[data-die="0"]').click()
+            bottom = pg.evaluate("document.getElementById('bar').getBoundingClientRect().bottom")
+            check(f"phone, {look_name}: everything fits", bottom <= 845, bottom)
+            pg.screenshot(path=os.path.join(SHOTS, f"look-{look_name}-phone.png"))
+            pg.close()
 
         check("nothing was fetched from outside the test server", not outside, outside[:5])
         check("no page errors", not errors, errors[:5])

@@ -38,6 +38,8 @@ export const FILES = Object.freeze([
   { path: '/prism-record.js', file: join(TILE, 'prism-record.js'), type: 'text/javascript' },
   { path: '/game-client.js', file: join(TILE, 'game-client.js'), type: 'text/javascript' },
   { path: '/icon.png', file: join(TILE, 'icon.png'), type: 'image/png' },
+  { path: '/silkscreen.woff', file: join(TILE, 'silkscreen.woff'), type: 'font/woff' },
+  { path: '/Silkscreen-OFL.txt', file: join(TILE, 'Silkscreen-OFL.txt'), type: 'text/plain' },
 ]);
 export const ICONS = Object.freeze([{ src: '/icon.png', sizes: '256x256' }]);
 

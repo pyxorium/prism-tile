@@ -65,7 +65,11 @@ const base = (s, st, over = {}) => ({ fetchImpl: s.fetchImpl, ask: yes, askHidde
 // ---- the tile ----
 
 test('the files Prism publishes, and the approved engine', async () => {
-  assert.deepEqual(FILES.map((f) => f.path), ['/', '/engine.wasm', '/engine.js', '/prism-record.js', '/game-client.js', '/icon.png']);
+  assert.deepEqual(FILES.map((f) => f.path), ['/', '/engine.wasm', '/engine.js', '/prism-record.js', '/game-client.js', '/icon.png', '/silkscreen.woff', '/Silkscreen-OFL.txt']);
+  // The Retro CRT look's pixel font travels with its licence (SIL Open Font License), and the page loads it from beside itself.
+  assert.match(read('tile/Silkscreen-OFL.txt').toString(), /SIL OPEN FONT LICENSE Version 1\.1/);
+  assert.match(read('tile/index.html').toString(), /url\("\.\/silkscreen\.woff"\)/);
+  assert.equal(read('tile/silkscreen.woff').subarray(0, 4).toString(), 'wOFF');
   assert.equal(FILES.find((f) => f.path === '/engine.wasm').type, 'application/wasm');
   for (const f of FILES) assert.ok(read(f.file.replaceAll('\\', '/')).length > 0, f.file);
   assert.equal(await rawCid(new Uint8Array(read('engine/engine.wasm'))), ENGINE_CID);

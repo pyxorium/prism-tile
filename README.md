@@ -42,6 +42,17 @@ What gets published as the web tile:
   (`checkRecord`: it must replay to exactly its board and score).
 - `game-client.js`: an exact copy of the Game Host Kit's game helper (a test checks, when the kit is next to this folder).
 - `manifest.json` (name, description, 380 × 460), `icon.png`.
+- `silkscreen.woff`, `Silkscreen-OFL.txt`: the Retro CRT look's pixel font, [Silkscreen](https://github.com/googlefonts/silkscreen)
+  (trimmed to the characters Prism uses), with its licence, the SIL Open Font License 1.1.
+
+**Looks** (the menu at the bottom left): **Classic**; **Prism light** (a slow spectrum around the board, from a small
+WebGL shader drawn at a quarter size about 8 times a second and only while the tile is on screen; glass dice whose
+rainbow rims turn with it; a soft CSS fallback without WebGL); **Retro CRT** (scanlines, a vignette, a slow rolling
+band, square glowing pips, the pixel font, casts that flicker on). A look changes only what you see, never the rules,
+the engine or a saved game. Every look celebrates a rainbow row ("Rainbow bonus +3") and a full board. With reduced
+motion nothing moves on its own. The page remembers the look where it can; inside Raku a tile can't (each load
+starts fresh), so it opens on Classic there. For checks: `?look=prism` or `?look=retro`, and `?seed=…` for a
+free-play seed.
 
 **Daily and free play:** the daily game's dice come from the America/Denver day, the same for everyone; free play
 picks a random seed. **Saving** goes through the host (the Game Host Kit): Save shows only when the host offers to save
