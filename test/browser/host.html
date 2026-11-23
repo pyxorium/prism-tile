@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prism in a stand-in host</title>
+<style>
+  :root { color-scheme: dark; font: 14px/1.45 system-ui, sans-serif; background: #15171d; color: #ddd; }
+  body { margin: 0; padding: 12px; }
+  .stage { display: flex; gap: 12px; align-items: flex-start; }
+  iframe { width: 380px; height: 460px; border: 1px solid #fff3; border-radius: 10px; background: #0b0d14; flex: none; }
+  .log { font: 11px/1.5 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; height: 460px; overflow: auto; flex: 1; margin: 0; }
+  dialog { max-width: 460px; } dialog pre { font-size: 11px; max-height: 220px; overflow: auto; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <iframe id="game" title="Prism"></iframe>
+  <pre class="log" id="log"></pre>
+</div>
+<dialog id="ask"><form method="dialog">
+  <p id="askText"></p><p id="askCheck"></p><pre id="askRecord"></pre>
+  <button value="no">No</button> <button value="yes">Save it</button>
+</form></dialog>
+<script type="module">
+// A stand-in host for Prism's checks, built on the Game Host Kit's host helper (served at /kit/), checking each game
+// by replaying it through the tile's own engine before asking, as Raku will.
+//   ?save=0  a host that saves for other games but not Prism       ?who=none  no one signed in
+import { attachToFrame } from "/kit/host/game-host.js";
+import { loadEngine } from "/tile/engine.js";
+import { checkRecord } from "/tile/prism-record.js";
+
+const params = new URLSearchParams(location.search);
+const TILE = { uri: "at://did:plc:standinstandinstandinst/ing.dasl.masl/3prismstandin", cid: "bafyreiprismstandinversion" };
+const PLAYER = params.get("who") === "none" ? null : { did: "did:plc:aliceexamplealiceexample", handle: "alice.example" };
+const engine = await loadEngine(await (await fetch("/tile/engine.wasm")).arrayBuffer());
+const frame = document.getElementById("game");
+const logBox = document.getElementById("log");
+window.saved = [];
+const log = (dir, p) => { logBox.textContent += `${dir === "in" ? "game → host" : "host → game"}  ${JSON.stringify(p)}\n`; };
+
+attachToFrame(frame, {
+  tile: () => TILE,
+  player: () => PLAYER,
+  save: {
+    collections: () => (params.get("save") === "0" ? ["com.example.other"] : ["cafe.thunderbird.prism.game"]),
+    write: ({ collection, record, game, status }) => new Promise((resolve) => {
+      if (!PLAYER) { resolve({ ok: false, error: "declined" }); return; }
+      const check = checkRecord(engine, record);
+      if (!check.ok) { window.lastRefusal = check.problem; resolve({ ok: false, error: "invalid" }); return; }
+      const full = { $type: collection, ...record, game, createdAt: new Date().toISOString() };
+      status("asking");
+      const ask = document.getElementById("ask");
+      document.getElementById("askText").textContent = `Save this to @${PLAYER.handle}'s account?`;
+      document.getElementById("askCheck").textContent = "Checked: the moves replay to this board and score ✓";
+      document.getElementById("askRecord").textContent = JSON.stringify(full, null, 2);
+      ask.addEventListener("close", function done() {
+        ask.removeEventListener("close", done);
+        if (ask.returnValue !== "yes") { resolve({ ok: false, error: "declined" }); return; }
+        status("saving");
+        const uri = `at://${PLAYER.did}/${collection}/3save${window.saved.length + 1}`;
+        window.saved.push({ uri, record: full });
+        setTimeout(() => resolve({ ok: true, uri, handle: PLAYER.handle }), 200);
+      });
+      ask.showModal();
+    }),
+  },
+  openRecord: (uri) => { window.opened = uri; },
+}, { watch: log });
+frame.src = "/tile/index.html";
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@ A dice puzzle web tile: House Dice's Prism on its original 3 × 4 board. Its rul
 WebAssembly engine, `engine/engine.wasm`, which the tile's page plays through and which any host can
 use to check a saved game by replaying its moves.
 
-**Status:** stage 1 of 5, the engine. The tile's page, the lexicon, publishing and Raku's part come next.
+**Status:** stages 1 and 2 of 5: the engine and the tile's page. The lexicon, publishing and Raku's part come next.
 
 ## The engine
 
@@ -29,12 +29,35 @@ hash of `prism:` + the America/Denver day (`seed_for_day` in the engine); free p
 **A move** is one number: which die in the pool (0 to 3, among the dice left, in the order cast) × 12 + the
 cell (0 to 11). A game has at most 24.
 
+## The tile (`tile\`)
+
+What gets published as the web tile:
+
+- `index.html`: the game. It never decides anything itself: it asks the engine for the pool, the board, the lit cells
+  and the score, and tells it where each die goes. House Dice's look (glowing pips, colour-tinted and pip-marked cells,
+  the cast animation; the pool beneath the board), sized to whatever frame it's given.
+- `engine.wasm`, `engine.js`: exact copies of `engine\` (a test checks).
+- `prism-record.js`: the record a finished game sends to save (`recordFromGame`), and the check a host can run on one
+  (`checkRecord`: it must replay to exactly its board and score).
+- `game-client.js`: an exact copy of the Game Host Kit's game helper (a test checks, when the kit is next to this folder).
+- `manifest.json` (name, description, 380 × 460), `icon.png`.
+
+**Daily and free play:** the daily game's dice come from the America/Denver day, the same for everyone; free play
+picks a random seed. **Saving** goes through the host (the Game Host Kit): Save shows only when the host offers to save
+`cafe.thunderbird.prism.game`. The record holds `mode`, `day` (daily) or `seed` (free play), `moves`, `board` (12
+strings such as `"teal-3"` or `"empty"`), `filled`, `empty`, `rainbowRows`, `score`; the host adds `$type`, `createdAt`
+and which tile and version made it. **The character spot** (`#character`) is kept empty for now.
+
 ## Commands (directly in `C:\thunderbird-cafe\prism-tile`)
 
-- `npm test`: the engine against the reference over 100,000 random games (every pool, board, legal cell,
+- `npm test`: the tile's copies and its records; the engine against the reference over 100,000 random games (every pool, board, legal cell,
   draw count and score compared after every move), illegal moves, replays, daily seeds, no imports; with
   clang installed, also six copies of the engine with one rule broken, each caught. About 15 seconds.
   `$env:PRISM_GAMES = 2000` first for a quick run.
+- `python test\browser\check_tile.py`: the page in Chromium (needs Playwright), on its own and in a stand-in host
+  built on the Game Host Kit (the kit's folder next to this one, or give its path): whole games played by clicking,
+  saved, and each saved record replayed; screenshots at card and phone sizes into `test\browser\screenshots\`.
+- `Get-Content record.json | node test\browser\replay-record.mjs`: check one saved game by hand.
 - `node scripts/simulate.mjs`: how two made-up players do.
 - `node scripts/build-engine.mjs`: rebuild `engine.wasm` (needs clang with the wasm32 target). Only a rules
   change should need this: hosts approve engines by CID. `node scripts/build-engine.mjs --check` says whether

@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!--
+  Prism: House Dice's dice puzzle on its original 3 x 4 board, as a web tile.
+
+  RULES: in engine.wasm (built from engine/prism.c in pyxorium/prism-tile). This page never decides anything:
+  it asks the engine for the pool, the board, the lit cells and the score, and tells it where a die goes. So a
+  host can check a saved game by replaying its moves through the very same engine.wasm.
+
+  DAILY AND FREE PLAY: the daily game's dice come from the day (the America/Denver day), the same for everyone;
+  free play picks a fresh random seed and keeps it with the game. Only the looks (each die's tilt, landing spot and
+  cast timing) are truly random, and they never touch the rules.
+
+  HOST: the Game Host Kit (game-client.js, an exact copy of the kit's). Who's playing and Save show only when the
+  host offers them; on its own the game just plays. The character spot (#character) is kept empty for now.
+
+  CSP: no network; WebAssembly allowed.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self' blob: data: 'unsafe-inline' 'wasm-unsafe-eval'; script-src-attr 'none'; style-src 'self' blob: data: 'unsafe-inline'; form-action 'none'; manifest-src 'none'; object-src 'none'; base-uri 'none';">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prism</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+    background: #0b0d14; color: #e8ecf4;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-user-select: none; user-select: none;
+  }
+  :root { --cell: 64px; --gap: calc(var(--cell) * 0.12); --red: #FF5A54; --lemon: #F7E733; --teal: #2FE3A0; --violet: #B48CFF; }
+  #app { display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%; padding: 6px 8px; }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: max(calc(var(--cell) * 4 + var(--gap) * 3), min(100%, 340px)); height: 30px; flex: none; }
+  .title { font-weight: 700; letter-spacing: 0.05em; font-size: 19px; line-height: 1; }
+  /* A very subtle CRT look: faint scanlines through the letters, a soft phosphor glow, a hair of colour fringing,
+     and a slow, barely-there flicker (off for anyone who asks for reduced motion). */
+  .title span {
+    background:
+      repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px),
+      linear-gradient(90deg, var(--red), var(--lemon), var(--teal), var(--violet));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0.6px 0 0 rgba(255, 60, 90, 0.35)) drop-shadow(-0.6px 0 0 rgba(60, 170, 255, 0.35)) drop-shadow(0 0 3px rgba(200, 220, 255, 0.28));
+    animation: crtFlicker 7s steps(1, end) infinite;
+  }
+  @keyframes crtFlicker { 0%, 100% { opacity: 1; } 41% { opacity: 0.94; } 42% { opacity: 1; } 77% { opacity: 0.97; } 78% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .title span { animation: none; } }
+  .modes { display: inline-flex; border: 1px solid #ffffff22; border-radius: 999px; overflow: hidden; }
+  .modes button { appearance: none; border: 0; background: transparent; color: #9aa3b5; font: inherit; font-size: 12px; padding: 4px 10px; cursor: pointer; }
+  .modes button[aria-pressed="true"] { background: #ffffff1c; color: #e8ecf4; }
+  .modes button:hover { color: #e8ecf4; }
+
+  #boardWrap { position: relative; flex: none; margin-top: 4px; }
+  .board { display: grid; grid-template-columns: repeat(4, var(--cell)); grid-auto-rows: var(--cell); gap: var(--gap); padding: calc(var(--gap) * 0.75); border-radius: calc(var(--cell) * 0.18); background: #ffffff06; border: 1px solid #ffffff10; }
+  .board.free { border-style: dashed; border-color: #ffffff26; }
+
+  .cell { position: relative; appearance: none; padding: 0; margin: 0; font: inherit; color: inherit; width: var(--cell); height: var(--cell); border-radius: 18%; border: 1.5px dashed #ffffff26; background: transparent; cursor: default; }
+  .cell.lit { border-style: solid; border-color: var(--lit); box-shadow: 0 0 calc(var(--cell) * 0.16) color-mix(in srgb, var(--lit) 45%, transparent), inset 0 0 calc(var(--cell) * 0.12) color-mix(in srgb, var(--lit) 25%, transparent); cursor: pointer; animation: litPulse 1.6s ease-in-out infinite; }
+  .cell.lit:hover { background: color-mix(in srgb, var(--lit) 12%, transparent); }
+  @keyframes litPulse { 50% { box-shadow: 0 0 calc(var(--cell) * 0.26) color-mix(in srgb, var(--lit) 60%, transparent), inset 0 0 calc(var(--cell) * 0.12) color-mix(in srgb, var(--lit) 25%, transparent); } }
+  .rpip { position: absolute; width: 17%; height: 17%; border-radius: 50%; transform: translate(-50%, -50%); background: #ffffff2e; }
+
+  .die { position: relative; width: var(--cell); height: var(--cell); border-radius: 18%; background: linear-gradient(160deg, #1d2132, #121521); border: 1px solid #ffffff1f; box-shadow: 0 2px 6px #0008; }
+  .pip { position: absolute; width: 17%; height: 17%; border-radius: 50%; transform: translate(-50%, -50%); }
+
+  #tray { display: flex; align-items: center; justify-content: center; gap: calc(var(--cell) * 0.22); height: calc(var(--cell) * 0.95); margin-top: calc(var(--cell) * 0.18); flex: none; width: calc(var(--cell) * 4 + var(--gap) * 3); }
+  #tray .die { --size: calc(var(--cell) * 0.82); width: var(--size); height: var(--size); cursor: pointer; transform: translate(var(--dx, 0px), var(--dy, 0px)) rotate(var(--tilt, 0deg)); transition: box-shadow 0.15s, translate 0.15s; }
+  #tray .die:hover { box-shadow: 0 2px 10px #000a, 0 0 0 1px #ffffff40; }
+  #tray .die.selected { translate: 0 calc(var(--cell) * -0.1); box-shadow: 0 0 0 2px var(--glow), 0 0 calc(var(--cell) * 0.3) color-mix(in srgb, var(--glow) 55%, transparent); }
+  #tray .die.casting { animation: castSpin var(--dur, 1000ms) cubic-bezier(0.34, 1.56, 0.64, 1) both, castFade var(--dur, 1000ms) ease both; }
+  #tray .die.frozen { opacity: 0.4; cursor: default; }
+  @keyframes castSpin { from { transform: translate(0, calc(var(--cell) * -0.6)) rotate(calc(var(--tilt, 0deg) - 540deg)) scale(0.35); } to { transform: translate(var(--dx, 0px), var(--dy, 0px)) rotate(var(--tilt, 0deg)) scale(1); } }
+  @keyframes castFade { from { opacity: 0; } 35% { opacity: 1; } to { opacity: 1; } }
+  #castBtn { appearance: none; font: inherit; font-size: 14px; color: #e8ecf4; background: #ffffff10; border: 1.5px solid #ffffff3a; border-radius: 999px; padding: 8px 22px; cursor: pointer; }
+  #castBtn:hover { background: #ffffff1e; }
+
+  #statusRow { display: flex; justify-content: space-between; gap: 10px; width: max(calc(var(--cell) * 4 + var(--gap) * 3), min(100%, 340px)); white-space: nowrap; font-size: 12px; color: #9aa3b5; margin-top: 6px; min-height: 18px; flex: none; }
+  #hint { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  #draws { flex: none; font-variant-numeric: tabular-nums; }
+  #bar { display: flex; align-items: center; gap: 8px; width: max(calc(var(--cell) * 4 + var(--gap) * 3), min(100%, 340px)); white-space: nowrap; font-size: 12px; color: #7d8699; margin-top: auto; min-height: 20px; flex: none; }
+  #who { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #character:empty { display: none; }
+
+  #endPanel { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--cell) * 0.06); border-radius: calc(var(--cell) * 0.18); background: #0b0d14b8; backdrop-filter: blur(1px); text-align: center; padding: 8px; }
+  #endPanel[hidden] { display: none; }
+  #endLabel { font-size: 12px; color: #9aa3b5; letter-spacing: 0.03em; }
+  #endScore { font-size: calc(var(--cell) * 0.5); font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; }
+  #endParts { font-size: 12px; color: #b8c1d3; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 4px; }
+  .actions button { appearance: none; font: inherit; font-size: 13px; color: #e8ecf4; background: transparent; border: 1.5px solid #8cb4ff; border-radius: 999px; padding: 5px 14px; cursor: pointer; }
+  .actions button.quiet { border-color: #ffffff3a; }
+  .actions button:hover:not(:disabled) { background: #8cb4ff22; }
+  .actions button:disabled { opacity: 0.6; cursor: default; }
+  .actions button[hidden] { display: none; }
+  #saveStatus { font-size: 12px; color: #9aa3b5; min-height: 16px; }
+  #saveStatus .ok { color: #e8ecf4; }
+  #saveNote[hidden] { display: none; }
+  #saveNote { font-size: 12px; color: #9aa3b5; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="title"><span>Prism</span></div>
+    <div class="modes" role="group" aria-label="Game">
+      <button type="button" id="dailyBtn" aria-pressed="true">Daily</button>
+      <button type="button" id="freeBtn" aria-pressed="false">Free play</button>
+    </div>
+  </header>
+  <div id="boardWrap">
+    <div id="board" class="board" role="grid" aria-label="The board"></div>
+    <div id="endPanel" hidden>
+      <div id="endLabel"></div>
+      <div id="endScore"></div>
+      <div id="endParts"></div>
+      <div class="actions">
+        <button type="button" id="saveBtn" hidden>Save this game</button>
+        <button type="button" id="seeBtn" class="quiet" hidden>See it</button>
+        <button type="button" id="againBtn" class="quiet">Play again</button>
+      </div>
+      <div id="saveStatus" role="status" aria-live="polite"></div>
+      <div id="saveNote" hidden>This page doesn't save Prism games.</div>
+    </div>
+  </div>
+  <div id="tray" aria-label="The pool"></div>
+  <div id="statusRow"><span id="hint"></span><span id="draws"></span></div>
+  <div id="bar">
+    <span id="character"></span>
+    <span id="who"></span>
+    <span id="dayLabel"></span>
+  </div>
+</div>
+
+<script type="module">
+import { loadEngine } from "./engine.js";
+import { recordFromGame, COLLECTION } from "./prism-record.js";
+import { connectToHost } from "./game-client.js";
+
+const $ = (id) => document.getElementById(id);
+const HEX = { red: "#FF5A54", lemon: "#F7E733", teal: "#2FE3A0", violet: "#B48CFF" };
+// House Dice's pip positions (fractions of the die from its centre).
+const PIPS = {
+  1: [[0, 0]],
+  2: [[-0.28, -0.28], [0.28, 0.28]],
+  3: [[-0.28, -0.28], [0, 0], [0.28, 0.28]],
+  4: [[-0.28, -0.28], [0.28, -0.28], [-0.28, 0.28], [0.28, 0.28]],
+  5: [[-0.28, -0.28], [0.28, -0.28], [0, 0], [-0.28, 0.28], [0.28, 0.28]],
+  6: [[-0.28, -0.28], [0.28, -0.28], [-0.28, 0], [0.28, 0], [-0.28, 0.28], [0.28, 0.28]],
+};
+
+// ---- layout: the cell size follows the frame, the pool beneath the board ----
+function layout() {
+  const w = window.innerWidth - 16, h = window.innerHeight - 12 - 30 - 4 - 4 - 24 - 22;
+  const byWidth = w / (4 + 3 * 0.12);
+  const byHeight = h / (3 + 2 * 0.12 + 0.18 + 0.18 + 0.95 + 0.1);
+  const cell = Math.max(26, Math.min(110, Math.floor(Math.min(byWidth, byHeight))));
+  document.documentElement.style.setProperty("--cell", `${cell}px`);
+}
+window.addEventListener("resize", layout);
+layout();
+
+function drawPips(el, number, colour, cls) {
+  for (const [dx, dy] of PIPS[number] || []) {
+    const s = document.createElement("span");
+    s.className = cls;
+    s.style.left = `${50 + dx * 100}%`;
+    s.style.top = `${50 + dy * 100}%`;
+    if (colour) { s.style.background = colour; s.style.boxShadow = `0 0 5px 1px ${colour}`; }
+    el.append(s);
+  }
+}
+function dieEl(d) {
+  const el = document.createElement("div");
+  el.className = "die";
+  drawPips(el, d.number, HEX[d.color], "pip");
+  el.setAttribute("aria-label", `${d.color} ${d.number}`);
+  return el;
+}
+
+// ---- the denver day ----
+function denverDay(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Denver", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+}
+function shortDay(day) {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+// ---- state ----
+let engine;
+try {
+  engine = await loadEngine(await (await fetch("./engine.wasm")).arrayBuffer());
+} catch (e) {
+  $("hint").textContent = "Couldn't start the game.";
+  throw e;
+}
+let mode = "daily";
+let game = null;          // { mode, day } or { mode, seed }; null until cast
+let selected = null;
+let shownCasts = 0;
+let looks = [];           // per pool die: { tilt, dx, dy, dur } (cosmetic only)
+let note = "";            // a one-off line for the hint (e.g. a recast)
+let savedUri = null;
+let saving = false;
+
+function freshLooks(n) {
+  looks = Array.from({ length: n }, () => {
+    const angle = Math.random() * 2 * Math.PI, mag = Math.sqrt(Math.random());
+    return { tilt: Math.random() * 24 - 12, dx: 5 * mag * Math.cos(angle), dy: 4 * mag * Math.sin(angle), dur: Math.round(850 + Math.random() * 300) };
+  });
+}
+
+function newBoard(m) {
+  mode = m;
+  game = null;
+  selected = null;
+  savedUri = null;
+  note = "";
+  $("dailyBtn").setAttribute("aria-pressed", String(mode === "daily"));
+  $("freeBtn").setAttribute("aria-pressed", String(mode === "free"));
+  render();
+}
+
+function cast() {
+  if (mode === "daily") {
+    game = { mode: "daily", day: denverDay() };
+    engine.startDaily(game.day);
+  } else {
+    game = { mode: "free", seed: crypto.getRandomValues(new Uint32Array(1))[0] };
+    engine.start(game.seed);
+  }
+  selected = null;
+  savedUri = null;
+  shownCasts = 0;
+  render();
+}
+
+function place(cell) {
+  if (selected == null || !engine.place(selected, cell)) return;
+  const before = looks.filter((_, i) => i !== selected);
+  const castsBefore = shownCasts;
+  selected = null;
+  const s = engine.state();
+  if (s.casts === castsBefore) looks = before;
+  else if (before.length > 0 && !s.over) note = "No die could go anywhere, so the pool was cast again.";
+  render();
+}
+
+function render() {
+  const board = $("board");
+  board.classList.toggle("free", mode === "free");
+  board.replaceChildren();
+  const s = game ? engine.state() : null;
+  const litMask = s && !s.over && selected != null ? engine.legalMask(selected) : 0;
+  const litColour = s && selected != null && s.pool[selected] ? HEX[s.pool[selected].color] : null;
+  for (let c = 0; c < 12; c++) {
+    const placed = s && s.board[c];
+    if (placed) {
+      const el = dieEl(placed);
+      el.setAttribute("role", "gridcell");
+      el.dataset.cell = c;
+      board.append(el);
+      continue;
+    }
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "cell";
+    el.dataset.cell = c;
+    el.setAttribute("role", "gridcell");
+    const rule = engine.layout[c];
+    if (rule && rule.type === "color") {
+      el.style.borderColor = `${HEX[rule.value]}88`;
+      el.style.background = `${HEX[rule.value]}14`;
+      el.setAttribute("aria-label", `only ${rule.value}`);
+    } else if (rule && rule.type === "number") {
+      drawPips(el, rule.value, null, "rpip");
+      el.setAttribute("aria-label", `only a ${rule.value}`);
+    } else {
+      el.setAttribute("aria-label", "any die");
+    }
+    if (litMask & (1 << c)) {
+      el.classList.add("lit");
+      el.style.setProperty("--lit", litColour);
+      el.addEventListener("click", () => place(c));
+    }
+    board.append(el);
+  }
+
+  // The pool, or the Cast button.
+  const tray = $("tray");
+  tray.replaceChildren();
+  if (!s) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "castBtn";
+    btn.textContent = "Cast dice";
+    btn.addEventListener("click", cast);
+    tray.append(btn);
+  } else {
+    const castNow = s.casts !== shownCasts;
+    if (castNow) { freshLooks(s.pool.length); shownCasts = s.casts; }
+    s.pool.forEach((d, i) => {
+      const el = dieEl(d);
+      const look = looks[i] || { tilt: 0, dx: 0, dy: 0, dur: 1000 };
+      el.style.setProperty("--tilt", `${look.tilt}deg`);
+      el.style.setProperty("--dx", `${look.dx}px`);
+      el.style.setProperty("--dy", `${look.dy}px`);
+      el.style.setProperty("--dur", `${look.dur}ms`);
+      el.style.setProperty("--glow", HEX[d.color]);
+      el.dataset.die = i;
+      if (s.over) el.classList.add("frozen");
+      else {
+        el.setAttribute("role", "button");
+        el.tabIndex = 0;
+        if (selected === i) el.classList.add("selected");
+        if (castNow) el.classList.add("casting");
+        const pick = () => { selected = selected === i ? null : i; note = ""; render(); };
+        el.addEventListener("click", pick);
+        el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } });
+      }
+      tray.append(el);
+    });
+  }
+
+  // The lines under the board.
+  let hint;
+  if (!s) hint = mode === "daily" ? "Today's dice are the same for everyone." : "Fresh dice every game.";
+  else if (s.over) hint = s.pool.length ? "still in the tray when the game ended" : "";
+  else if (note) hint = note;
+  else if (selected == null) hint = "pick a die from the pool";
+  else if (!litMask) hint = "no legal spot for this one: try another die";
+  else hint = "tap a lit space to place it";
+  $("hint").textContent = hint;
+  $("draws").textContent = s ? `draws ${Math.min(s.draws, engine.maxDrawn)} of ${engine.maxDrawn}` : "";
+  $("dayLabel").textContent = mode === "daily" ? `Daily · ${shortDay(game ? game.day : denverDay())}` : "Free play";
+
+  // The end of the game.
+  const end = $("endPanel");
+  end.hidden = !(s && s.over);
+  if (s && s.over) {
+    $("endLabel").textContent = game.mode === "daily" ? `Prism · daily, ${shortDay(game.day)}` : "Prism · free play";
+    $("endScore").textContent = String(s.score);
+    $("endParts").textContent = `${s.filled} filled · ${s.rainbowRows} rainbow row${s.rainbowRows === 1 ? "" : "s"} · ${s.empty} empty`;
+    updateSave();
+  }
+}
+
+// ---- the host ----
+const host = await connectToHost({ name: "prism", timeoutMs: 0 });
+
+function updateSave() {
+  const can = host.canSave(COLLECTION);
+  $("saveBtn").hidden = !can || !!savedUri;
+  $("saveBtn").disabled = saving;
+  $("seeBtn").hidden = !savedUri;
+  $("saveNote").hidden = !(host.offers("save") && !can);
+  if (!savedUri && !saving) $("saveStatus").textContent = "";
+}
+host.on("offers", () => { if (!$("endPanel").hidden) updateSave(); });
+host.on("player", (p) => { $("who").textContent = p ? `Playing as @${p.handle || p.did}` : "Playing as a guest"; });
+// The character spot (#character) is kept for later; Prism doesn't show a character yet.
+
+$("saveBtn").addEventListener("click", async () => {
+  if (!game || saving) return;
+  saving = true;
+  updateSave();
+  const say = (html) => { $("saveStatus").innerHTML = html; };
+  say("Waiting for the host…");
+  const record = recordFromGame(game, engine.state());
+  const r = await host.save({ collection: COLLECTION, record, onStatus: (st) => say(st === "asking" ? "Waiting for you to allow it…" : "Saving…") });
+  saving = false;
+  if (r.ok) {
+    savedUri = r.uri;
+    updateSave();
+    say(`<span class="ok">Saved to @${(r.handle || "your").replace(/[<>&"]/g, "")}'s account ✓</span>`);
+    return;
+  }
+  updateSave();
+  say({ declined: "Not saved.", "not-allowed": "This page can't save this game.", invalid: "The page couldn't accept this game.", failed: "Couldn't save. Try again." }[r.error] || "Couldn't save.");
+});
+$("seeBtn").addEventListener("click", () => { if (savedUri) host.openRecord(savedUri); });
+$("againBtn").addEventListener("click", () => newBoard(mode));
+$("dailyBtn").addEventListener("click", () => newBoard("daily"));
+$("freeBtn").addEventListener("click", () => newBoard("free"));
+
+render();
+</script>
+</body>
+</html>

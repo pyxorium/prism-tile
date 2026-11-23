@@ -1,0 +1,3 @@
+commit-*.txt
+test/browser/screenshots/
+node_modules/
