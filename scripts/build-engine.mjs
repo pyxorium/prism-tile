@@ -36,12 +36,12 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     rmSync(tmp, { force: true });
     const committed = existsSync(target) ? readFileSync(target) : Buffer.alloc(0);
     const same = Buffer.compare(fresh, committed) === 0;
-    console.log(`Fresh build: ${fresh.length} bytes, ${rawCid(fresh)}`);
-    console.log(`engine.wasm: ${committed.length} bytes, ${rawCid(committed)}`);
+    console.log(`Fresh build: ${fresh.length} bytes, ${await rawCid(fresh)}`);
+    console.log(`engine.wasm: ${committed.length} bytes, ${await rawCid(committed)}`);
     console.log(same ? 'They match.' : 'They DIFFER (a different clang, or prism.c changed).');
     process.exit(same ? 0 : 1);
   }
   const bytes = build(target);
   writeFileSync(target, bytes);
-  console.log(`engine/engine.wasm: ${bytes.length} bytes, ${rawCid(bytes)}`);
+  console.log(`engine/engine.wasm: ${bytes.length} bytes, ${await rawCid(bytes)}`);
 }

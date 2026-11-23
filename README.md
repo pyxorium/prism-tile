@@ -4,7 +4,8 @@ A dice puzzle web tile: House Dice's Prism on its original 3 × 4 board. Its rul
 WebAssembly engine, `engine/engine.wasm`, which the tile's page plays through and which any host can
 use to check a saved game by replaying its moves.
 
-**Status:** stages 1 and 2 of 5: the engine and the tile's page. The lexicon, publishing and Raku's part come next.
+**Status:** stages 1 to 3 of 5: the engine, the tile's page, the lexicon and publishing. Raku's part (checking each
+game with the engine before saving it) comes next.
 
 ## The engine
 
@@ -48,9 +49,49 @@ picks a random seed. **Saving** goes through the host (the Game Host Kit): Save 
 strings such as `"teal-3"` or `"empty"`), `filled`, `empty`, `rainbowRows`, `score`; the host adds `$type`, `createdAt`
 and which tile and version made it. **The character spot** (`#character`) is kept empty for now.
 
+## Saved games: the record, and checking one
+
+A saved game is a `cafe.thunderbird.prism.game` record in the player's own repo (lexicon in `lexicons\`, published
+from thunderbird.cafe; the Wix TXT record `_lexicon.prism` points the name there). The game sends its own fields; the
+host adds the rest:
+
+| Field | From | What |
+|---|---|---|
+| `mode` | game | `daily` (the day's dice, the same for everyone) or `free` (free play) |
+| `day` | game | daily only: the America/Denver day, `YYYY-MM-DD` (never a seed) |
+| `seed` | game | free play only: 0 to 4294967295 (never a day) |
+| `moves` | game | 1 to 24 numbers: die (0 to 3) × 12 + cell (0 to 11) |
+| `board` | game | 12 strings, row by row: `"teal-3"` or `"empty"` |
+| `filled`, `empty`, `rainbowRows`, `score` | game | the end screen's numbers |
+| `game` | host | the tile it loaded: `{ uri, cid }` (a strongRef) |
+| `engine` | host | the CID of the `engine.wasm` it checked the game with (optional) |
+| `createdAt` | host | when it was saved |
+
+**To check a saved game** (what any host can do, in any language that runs WebAssembly): fetch the tile's
+`/engine.wasm` (it asks for no imports), work out the seed (`seed_for_day(year, month, day)` for a daily game, the
+record's `seed` for free play), write the moves into `replay_moves()`, call `replay(seed, count)`, and compare the
+board and score parts with the record's. In JavaScript that's `checkRecord(await loadEngine(bytes), record)` from
+`tile\prism-record.js`. By hand: `Get-Content record.json | node test\browser\replay-record.mjs`.
+
+**What a check shows:** these moves, under this engine, on these dice, give this board and score. Not that a person
+played them, nor that it was their first try: a host that cares (Raku does) saves one daily game per player per day.
+
+## Publishing (thunderbird.cafe)
+
+- `node scripts\publish-lexicons.mjs --dry-run`, then without `--dry-run`: the lexicon, as a
+  `com.atproto.lexicon.schema` record (only when new or changed).
+- `node scripts\publish-tile.mjs --dry-run`, then without: the tile (`tile\`), the first time as a new record, later
+  updating the same record in place (only changed files uploaded; `swapRecord`; read back). **It publishes only the
+  approved engine** (`ENGINE_CID` in the script): `tile\engine.wasm` must be `engine\engine.wasm` with that CID.
+  Changing the page doesn't change the engine, so hosts that approve it by CID need nothing; a rules change is a new
+  engine, so `ENGINE_CID` is changed on purpose and hosts told.
+- Both take the app password from `$env:BSKY_APP_PASSWORD` (or ask, hidden) and keep what they published in
+  `published.json` (commit it). A replaced tile record is backed up in `backups\` first (not committed).
+
 ## Commands (directly in `C:\thunderbird-cafe\prism-tile`)
 
-- `npm test`: the tile's copies and its records; the engine against the reference over 100,000 random games (every pool, board, legal cell,
+- `npm test`: publishing against a stand-in server (and every record the game makes against the lexicon), the tile's
+  copies and its records; the engine against the reference over 100,000 random games (every pool, board, legal cell,
   draw count and score compared after every move), illegal moves, replays, daily seeds, no imports; with
   clang installed, also six copies of the engine with one rule broken, each caught. About 15 seconds.
   `$env:PRISM_GAMES = 2000` first for a quick run.
