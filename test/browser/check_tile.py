@@ -32,6 +32,32 @@ threading.Thread(target=srv.serve_forever, daemon=True).start()
 BASE = "http://127.0.0.1:8793"
 rng = random.Random(7)
 
+OVERLAP_JS = """async () => {
+  // Every animation frame for 1.4 s: the largest overlap between any two pool dice's on-screen boxes (rotated and
+  // scaled boxes included), in pixels. 0 means they never touched.
+  let worst = 0;
+  const t0 = performance.now();
+  while (performance.now() - t0 < 1400) {
+    await new Promise((r) => requestAnimationFrame(r));
+    const r = [...document.querySelectorAll('#tray .die')].map((e) => e.getBoundingClientRect());
+    for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) {
+      const x = Math.min(r[i].right, r[j].right) - Math.max(r[i].left, r[j].left);
+      const y = Math.min(r[i].bottom, r[j].bottom) - Math.max(r[i].top, r[j].top);
+      if (x > 0 && y > 0) worst = Math.max(worst, Math.min(x, y));
+    }
+  }
+  return worst;
+}"""
+
+def cast_overlap(pg, casts=6):
+    """Casts free-play pools several times and returns the worst overlap seen while they spin and land."""
+    worst = 0
+    for _ in range(casts):
+        pg.locator("#freeBtn").click()
+        pg.locator("#castBtn").click()
+        worst = max(worst, pg.evaluate(OVERLAP_JS))
+    return worst
+
 def play_to_end(g, page, illegal_try=True):
     """Plays one game by clicking: pick a random die, then a random lit cell. Returns the number of placements."""
     if g.locator("#castBtn").count():
@@ -84,6 +110,27 @@ try:
         check("on its own: the board and Cast dice show", page.locator("#board .cell").count() == 12)
         check("on its own: the restricted cells are drawn (2 colour-tinted, 2 with faint pips... and violet)",
               page.locator('.cell[aria-label^="only"]').count() == 5)
+        check("before the first cast, the hint gives the core rule", page.locator("#hint").text_content() == "Dice sharing an edge can't match color or number.", page.locator("#hint").text_content())
+        check("the title is solid (no CRT flicker or scanlines in this look)", page.evaluate("getComputedStyle(document.querySelector('.title span')).animationName") == "none" and "repeating" not in page.evaluate("getComputedStyle(document.querySelector('.title span')).backgroundImage"))
+        # How to play.
+        check("the help is closed at first", page.locator("#help").is_hidden() and page.locator("#helpBtn").get_attribute("aria-expanded") == "false")
+        page.locator("#helpBtn").click()
+        help_text = page.locator("#help").inner_text()
+        check("? opens How to play, with both headings and the owner's lines",
+              page.locator("#help").is_visible() and "Object of game" in help_text and "How to play" in help_text
+              and "Fill the board with dice selected from the pool, one at a time." in help_text
+              and "Lit spaces on the board show permissible plays for the selected die." in help_text
+              and "(rainbow bonus)" in help_text and "after 24 draws" in help_text and "new dice every game" in help_text, help_text[:120])
+        check("the help says color, not colour", "colour" not in help_text.lower() and "color" in help_text)
+        check("the help's two headings are bold headings", page.locator("#help h2").count() == 2)
+        page.screenshot(path=os.path.join(SHOTS, "0-card-380x460-help.png"))
+        page.locator("#helpClose").click()
+        check("Close closes it and gives the ? back its focus", page.locator("#help").is_hidden() and page.evaluate("document.activeElement.id") == "helpBtn")
+        page.locator("#helpBtn").click(); page.keyboard.press("Escape")
+        check("Escape closes it too", page.locator("#help").is_hidden())
+        ov = cast_overlap(page)
+        check("380x460: casting, the pool's dice never touch while they spin and land", ov == 0, f"worst overlap {ov:.1f}px")
+        page.locator("#dailyBtn").click()
         check("on its own: Daily is chosen, with today's label", page.locator("#dailyBtn").get_attribute("aria-pressed") == "true" and page.locator("#dayLabel").text_content().startswith("Daily · "))
         page.screenshot(path=os.path.join(SHOTS, "1-card-380x460-start.png"))
         page.locator("#castBtn").click()
@@ -126,12 +173,21 @@ try:
             pg = b.new_page(viewport={"width": w, "height": h})
             watch(pg)
             pg.goto(f"{BASE}/tile/index.html")
-            pg.locator("#castBtn").click(); pg.wait_for_timeout(1300)
+            ov = cast_overlap(pg)
+            check(f"{w}x{h}: casting, the pool's dice never touch while they spin and land", ov == 0, f"worst overlap {ov:.1f}px")
+            pg.locator("#castBtn").click() if pg.locator("#castBtn").count() else None
+            pg.wait_for_timeout(1300)
             pg.locator('#tray .die[data-die="0"]').click()
             cell = pg.evaluate("parseInt(getComputedStyle(document.documentElement).getPropertyValue('--cell'))")
             bottom = pg.evaluate("document.getElementById('bar').getBoundingClientRect().bottom")
             right = pg.evaluate("document.getElementById('board').getBoundingClientRect().right")
-            check(f"{w}x{h}: everything fits (cells {cell}px)", bottom <= h + 1 and right <= w + 1, (bottom, right))
+            hdr = pg.evaluate("[document.querySelector('header').getBoundingClientRect().right, document.getElementById('helpBtn').getBoundingClientRect().right]")
+            check(f"{w}x{h}: everything fits (cells {cell}px), the ? included", bottom <= h + 1 and right <= w + 1 and hdr[1] <= w, (bottom, right, hdr))
+            pg.locator("#helpBtn").click()
+            sc = pg.evaluate("(() => { const h = document.getElementById('help'); h.scrollTop = 1e6; const r = document.getElementById('helpClose').getBoundingClientRect(); return [r.bottom, h.scrollHeight > h.clientHeight]; })()")
+            check(f"{w}x{h}: the help fits or scrolls, and its Close can be reached", sc[0] <= h + 1, sc)
+            pg.screenshot(path=os.path.join(SHOTS, f"{name}-help.png"))
+            pg.locator("#helpClose").click()
             pg.screenshot(path=os.path.join(SHOTS, f"{name}.png"))
             pg.close()
 
