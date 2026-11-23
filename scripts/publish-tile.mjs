@@ -40,8 +40,11 @@ export const FILES = Object.freeze([
   { path: '/icon.png', file: join(TILE, 'icon.png'), type: 'image/png' },
   { path: '/silkscreen.woff', file: join(TILE, 'silkscreen.woff'), type: 'font/woff' },
   { path: '/Silkscreen-OFL.txt', file: join(TILE, 'Silkscreen-OFL.txt'), type: 'text/plain' },
+  { path: '/banner.jpg', file: join(TILE, 'banner.jpg'), type: 'image/jpeg' },
 ]);
 export const ICONS = Object.freeze([{ src: '/icon.png', sizes: '256x256' }]);
+// The preview picture hosts show on the tile's card (Raku's tile posts and cards: the first screenshot), 1280 x 720.
+export const SCREENSHOTS = Object.freeze([{ src: '/banner.jpg', sizes: '1280x720' }]);
 
 /** A raku.lexicographer.space link that opens a tile (Raku's own link shape). */
 export const rakuLink = (uri) => `https://raku.lexicographer.space/#t=${encodeURIComponent(uri)}&a=0`;
@@ -125,7 +128,8 @@ export async function runPublish({ fetchImpl = fetch, ask, askHidden, log = cons
   const changed = files.filter((f) => f.changed);
   const fieldsChanged = ['name', 'description'].some((k) => (before[k] ?? null) !== (fields[k] ?? null))
     || JSON.stringify(before.sizing ?? null) !== JSON.stringify(fields.sizing ?? null)
-    || JSON.stringify(before.icons ?? null) !== JSON.stringify(ICONS);
+    || JSON.stringify(before.icons ?? null) !== JSON.stringify(ICONS)
+    || JSON.stringify(before.screenshots ?? null) !== JSON.stringify(SCREENSHOTS);
   const uri = rkey ? `at://${ACCOUNT.did}/${COLLECTION}/${rkey}` : null;
 
   log(`\nTile: ${fields.name}  (@${ACCOUNT.handle})`);
@@ -135,7 +139,7 @@ export async function runPublish({ fetchImpl = fetch, ask, askHidden, log = cons
   log('\nThis will:');
   for (const f of changed) log(`  - ${f.was ? 'replace' : 'add'} ${f.path} with ${f.file} (${(f.bytes.length / 1024).toFixed(1)} KB, ${f.cid})`);
   for (const f of files.filter((x) => !x.changed)) log(`  - keep ${f.path} as it is`);
-  if (fieldsChanged) log(`  - ${current ? 'set' : 'give it'} the name, description, size and icon from tile\\manifest.json`);
+  if (fieldsChanged) log(`  - ${current ? 'set' : 'give it'} the name, description, size and icon from tile\\manifest.json, and the preview picture`);
   if (current) log('  - keep its address; anything that shows this address gets the new version');
   if (dryRun) { log('\nDry run: nothing was written.'); return { changed: false, due: changed.map((f) => f.path), uri }; }
 
@@ -157,7 +161,7 @@ export async function runPublish({ fetchImpl = fetch, ask, askHidden, log = cons
     log(`Saved a backup of the current record: backups\\${backupName}`);
   }
 
-  const next = { ...structuredClone(before), ...fields, icons: structuredClone(ICONS) };
+  const next = { ...structuredClone(before), ...fields, icons: structuredClone(ICONS), screenshots: structuredClone(SCREENSHOTS) };
   if (!fields.description) delete next.description;
   if (!fields.sizing) delete next.sizing;
   next.resources = { ...(next.resources || {}) };

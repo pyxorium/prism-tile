@@ -1,5 +1,5 @@
 {
   "name": "Prism",
-  "description": "A dice puzzle: place coloured dice on a 3 x 4 board so no two neighbours match colour or number. A daily game with the same dice for everyone, and free play. Its rules run as a WebAssembly engine any host can use to check a saved game.",
+  "description": "A dice puzzle: place colored dice on a 3 x 4 board so no two neighbours match color or number. A daily game with the same dice for everyone, and free play. Its rules run as a WebAssembly engine any host can use to check a saved game.",
   "sizing": { "width": 380, "height": 460 }
 }

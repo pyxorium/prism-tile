@@ -27,6 +27,18 @@ test('the manifest names the tile and its size', () => {
   const m = JSON.parse(read('tile', 'manifest.json'));
   assert.equal(m.name, 'Prism');
   assert.ok(m.description.length > 40 && m.description.length < 300);
+  assert.ok(!/colour/i.test(m.description), 'American "color" on the card (the owner, Nov 22)');
+  // the card's preview picture: a 1280 x 720 JPEG (its size from the JPEG's own frame header)
+  const jpg = new Uint8Array(readFileSync(new URL('../tile/banner.jpg', import.meta.url)));
+  assert.deepEqual([...jpg.slice(0, 3)], [0xff, 0xd8, 0xff]);
+  let i = 2, size = null;
+  while (i < jpg.length && !size) {
+    const marker = jpg[i + 1], len = (jpg[i + 2] << 8) | jpg[i + 3];
+    if (marker >= 0xc0 && marker <= 0xc2) size = [(jpg[i + 7] << 8) | jpg[i + 8], (jpg[i + 5] << 8) | jpg[i + 6]];
+    i += 2 + len;
+  }
+  assert.deepEqual(size, [1280, 720]);
+  assert.ok(jpg.length < 200 * 1024);
   assert.deepEqual(m.sizing, { width: 380, height: 460 });
 });
 

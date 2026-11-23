@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { runPublish, newTid, rakuLink, readManifestFields, ACCOUNT, COLLECTION, FILES, ICONS, ENGINE_CID } from '../scripts/publish-tile.mjs';
+import { runPublish, newTid, rakuLink, readManifestFields, ACCOUNT, COLLECTION, FILES, ICONS, SCREENSHOTS, ENGINE_CID } from '../scripts/publish-tile.mjs';
 import { runPublish as runLexicons, readLexicons, TXT, FAMILY } from '../scripts/publish-lexicons.mjs';
 import { rawCid } from '../scripts/lib/cid.js';
 import { dagCborCid } from '../scripts/lib/dagcbor.js';
@@ -65,7 +65,7 @@ const base = (s, st, over = {}) => ({ fetchImpl: s.fetchImpl, ask: yes, askHidde
 // ---- the tile ----
 
 test('the files Prism publishes, and the approved engine', async () => {
-  assert.deepEqual(FILES.map((f) => f.path), ['/', '/engine.wasm', '/engine.js', '/prism-record.js', '/game-client.js', '/icon.png', '/silkscreen.woff', '/Silkscreen-OFL.txt']);
+  assert.deepEqual(FILES.map((f) => f.path), ['/', '/engine.wasm', '/engine.js', '/prism-record.js', '/game-client.js', '/icon.png', '/silkscreen.woff', '/Silkscreen-OFL.txt', '/banner.jpg']);
   // The Retro CRT look's pixel font travels with its licence (SIL Open Font License), and the page loads it from beside itself.
   assert.match(read('tile/Silkscreen-OFL.txt').toString(), /SIL OPEN FONT LICENSE Version 1\.1/);
   assert.match(read('tile/index.html').toString(), /url\("\.\/silkscreen\.woff"\)/);
@@ -109,6 +109,8 @@ test('the first publish: a new record from thunderbird.cafe, its manifest addres
   assert.equal(rec.tile.resources['/engine.wasm']['content-type'], 'application/wasm');
   assert.equal(rec.tile.resources['/engine.wasm'].src.ref.$link, ENGINE_CID);
   assert.deepEqual(rec.tile.icons, ICONS);
+  assert.deepEqual(rec.tile.screenshots, [{ src: '/banner.jpg', sizes: '1280x720' }], 'the card\'s preview picture');
+  assert.deepEqual(rec.tile.screenshots, SCREENSHOTS);
   assert.equal(rec.tile.name, 'Prism');
   for (const f of FILES) assert.equal(rec.tile.resources[f.path].src.ref.$link, await rawCid(new Uint8Array(read(f.file.replaceAll('\\', '/')))));
   assert.equal(st.published.tile.uri, r.uri);

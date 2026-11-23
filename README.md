@@ -96,6 +96,8 @@ played them, nor that it was their first try: a host that cares (Raku does) save
   approved engine** (`ENGINE_CID` in the script): `tile\engine.wasm` must be `engine\engine.wasm` with that CID.
   Changing the page doesn't change the engine, so hosts that approve it by CID need nothing; a rules change is a new
   engine, so `ENGINE_CID` is changed on purpose and hosts told.
+- The card's preview picture is `tile\banner.jpg` (1280 × 720, the Prism light look one die from a full board), listed as
+  the tile's first screenshot (`SCREENSHOTS` in the script); Raku shows it on Prism's cards and tile posts.
 - Both take the app password from `$env:BSKY_APP_PASSWORD` (or ask, hidden) and keep what they published in
   `published.json` (commit it). A replaced tile record is backed up in `backups\` first (not committed).
 
