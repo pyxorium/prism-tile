@@ -1,0 +1,31 @@
+{
+  "account": {
+    "handle": "thunderbird.cafe",
+    "did": "did:plc:6vxjigxrqizmbo56gojxico3"
+  },
+  "lexicons": {
+    "cafe.thunderbird.prism.game": {
+      "uri": "at://did:plc:6vxjigxrqizmbo56gojxico3/com.atproto.lexicon.schema/cafe.thunderbird.prism.game",
+      "cid": "bafyreichiyo7zky7v3zhp6m7jqtv3ldbkbcxsudd5luwcx3hmdnfvqrsy4",
+      "text": "{\"lexicon\":1,\"id\":\"cafe.thunderbird.prism.game\",\"defs\":{\"main\":{\"type\":\"record\",\"description\":\"One finished game of Prism (a dice puzzle web tile), saved by its player to their own account. Written by the host page the game ran in, which fills in the game's address and version from the tile it actually ran. Anyone can check it: the tile's engine.wasm replays the moves on the game's dice (from the day, or from the seed) and must give exactly this board and score.\",\"key\":\"tid\",\"record\":{\"type\":\"object\",\"required\":[\"game\",\"mode\",\"moves\",\"board\",\"filled\",\"empty\",\"rainbowRows\",\"score\",\"createdAt\"],\"properties\":{\"game\":{\"type\":\"ref\",\"ref\":\"com.atproto.repo.strongRef\",\"description\":\"The Prism tile that played the game: its ing.dasl.masl record's address and exact version.\"},\"engine\":{\"type\":\"string\",\"format\":\"cid\",\"description\":\"The CID of the engine (the tile's /engine.wasm) that checked the game, when the host ran it.\"},\"mode\":{\"type\":\"string\",\"knownValues\":[\"daily\",\"free\"],\"description\":\"daily: the day's dice, the same for everyone (carries day, never seed). free: free play, dice from its own seed (carries seed, never day).\"},\"day\":{\"type\":\"string\",\"minLength\":10,\"maxLength\":10,\"description\":\"A daily game's day, YYYY-MM-DD (the America/Denver calendar day). Its dice come from the seed the engine works out for it (seed_for_day).\"},\"seed\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":4294967295,\"description\":\"A free-play game's seed.\"},\"moves\":{\"type\":\"array\",\"minLength\":1,\"maxLength\":24,\"items\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":47},\"description\":\"Every placement in order: which die in the pool (0 to 3, among the dice left, in the order cast) times 12, plus the cell (0 to 11, row by row from the top left).\"},\"board\":{\"type\":\"array\",\"minLength\":12,\"maxLength\":12,\"items\":{\"type\":\"string\",\"maxLength\":8},\"description\":\"The finished board, 12 cells row by row from the top left: a die as colour-number (red, lemon, teal or violet; 1 to 6), e.g. \\\"teal-3\\\", or \\\"empty\\\".\"},\"filled\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":12,\"description\":\"Cells filled.\"},\"empty\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":12,\"description\":\"Cells left empty.\"},\"rainbowRows\":{\"type\":\"integer\",\"minimum\":0,\"maximum\":3,\"description\":\"Full rows with all four colours.\"},\"score\":{\"type\":\"integer\",\"minimum\":-12,\"maximum\":21,\"description\":\"The score: +1 per filled cell, -1 per empty cell, +3 per rainbow row.\"},\"createdAt\":{\"type\":\"string\",\"format\":\"datetime\",\"description\":\"When the game was saved.\"}}}}}}",
+      "publishedAt": "2026-11-23T00:49:56.565Z"
+    }
+  },
+  "tile": {
+    "uri": "at://did:plc:6vxjigxrqizmbo56gojxico3/ing.dasl.masl/3n2ww7ntilcx6",
+    "cid": "bafyreiebxsnm22rgoulab6f6utyzzochp3kgpingvtz2c3tkuvie6aytpa",
+    "manifestCid": "bafyreia2jfh7eajqb6mtaqnw3hja4jqqo7woepq5lm6vvs7bfr5tldfyuu",
+    "files": {
+      "/": "bafkreidmn3dkqbgdognb7hlz5bftjkefc7gqhufyez6svjsjin57sa4uge",
+      "/engine.wasm": "bafkreierrxyrejorlhz5svmjoytchpk7cdcxifubhplz44lhj6u4l6uhra",
+      "/engine.js": "bafkreig5z72wpebig5q3vy7krskkwpfakgpltibdo36g25zqc7hcoqufcu",
+      "/prism-record.js": "bafkreies6pi3jehcffvkxnjrrterpfkqlunxvw3eyxlnxjfy6rhhd23el4",
+      "/game-client.js": "bafkreic6y74yidlzxx37uzspyd5hx7jitfucfncvxhzdfgt4rz2y5fcgwa",
+      "/icon.png": "bafkreidrz3chqii5dogb35wh3h7we4htx6xrjdwpfjxi2qrepeounqup7m"
+    },
+    "publishedAt": "2026-11-23T00:55:03.275Z",
+    "engine": "bafkreierrxyrejorlhz5svmjoytchpk7cdcxifubhplz44lhj6u4l6uhra",
+    "raku": "https://raku.lexicographer.space/#t=at%3A%2F%2Fdid%3Aplc%3A6vxjigxrqizmbo56gojxico3%2Fing.dasl.masl%2F3n2ww7ntilcx6&a=0",
+    "earlier": []
+  }
+}
