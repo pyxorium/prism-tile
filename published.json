@@ -13,19 +13,36 @@
   },
   "tile": {
     "uri": "at://did:plc:6vxjigxrqizmbo56gojxico3/ing.dasl.masl/3n2ww7ntilcx6",
-    "cid": "bafyreiebxsnm22rgoulab6f6utyzzochp3kgpingvtz2c3tkuvie6aytpa",
-    "manifestCid": "bafyreia2jfh7eajqb6mtaqnw3hja4jqqo7woepq5lm6vvs7bfr5tldfyuu",
+    "cid": "bafyreiacv2khkynbhoaaenb6xul5zl4im2r6hqc7wc4zizvscf4hzakgr4",
+    "manifestCid": "bafyreidmmdit3bw4vtqwhoh4dv36kp4x2kvqdt7ciw4crowmgvn4xakh5a",
     "files": {
-      "/": "bafkreidmn3dkqbgdognb7hlz5bftjkefc7gqhufyez6svjsjin57sa4uge",
+      "/": "bafkreigkungwvuxglk3cjtvs73mi7nzfopqaulnlw7iquafp6ytvroznqe",
       "/engine.wasm": "bafkreierrxyrejorlhz5svmjoytchpk7cdcxifubhplz44lhj6u4l6uhra",
       "/engine.js": "bafkreig5z72wpebig5q3vy7krskkwpfakgpltibdo36g25zqc7hcoqufcu",
       "/prism-record.js": "bafkreies6pi3jehcffvkxnjrrterpfkqlunxvw3eyxlnxjfy6rhhd23el4",
       "/game-client.js": "bafkreic6y74yidlzxx37uzspyd5hx7jitfucfncvxhzdfgt4rz2y5fcgwa",
-      "/icon.png": "bafkreidrz3chqii5dogb35wh3h7we4htx6xrjdwpfjxi2qrepeounqup7m"
+      "/icon.png": "bafkreidrz3chqii5dogb35wh3h7we4htx6xrjdwpfjxi2qrepeounqup7m",
+      "/silkscreen.woff": "bafkreiczvjh5jleeeujb7tsv62gycrdfc3dxyr75isknekqn7vnuwyscqm",
+      "/Silkscreen-OFL.txt": "bafkreifyie2s6ff7yptzxbzo3y6alksjxkawegffhszka7dgetgphcroue"
     },
-    "publishedAt": "2026-11-23T00:55:03.275Z",
+    "revisedAt": "2026-11-23T02:26:43.227Z",
     "engine": "bafkreierrxyrejorlhz5svmjoytchpk7cdcxifubhplz44lhj6u4l6uhra",
     "raku": "https://raku.lexicographer.space/#t=at%3A%2F%2Fdid%3Aplc%3A6vxjigxrqizmbo56gojxico3%2Fing.dasl.masl%2F3n2ww7ntilcx6&a=0",
-    "earlier": []
+    "earlier": [
+      {
+        "uri": "at://did:plc:6vxjigxrqizmbo56gojxico3/ing.dasl.masl/3n2ww7ntilcx6",
+        "cid": "bafyreiebxsnm22rgoulab6f6utyzzochp3kgpingvtz2c3tkuvie6aytpa",
+        "manifestCid": "bafyreia2jfh7eajqb6mtaqnw3hja4jqqo7woepq5lm6vvs7bfr5tldfyuu",
+        "files": {
+          "/": "bafkreidmn3dkqbgdognb7hlz5bftjkefc7gqhufyez6svjsjin57sa4uge",
+          "/icon.png": "bafkreidrz3chqii5dogb35wh3h7we4htx6xrjdwpfjxi2qrepeounqup7m",
+          "/engine.js": "bafkreig5z72wpebig5q3vy7krskkwpfakgpltibdo36g25zqc7hcoqufcu",
+          "/engine.wasm": "bafkreierrxyrejorlhz5svmjoytchpk7cdcxifubhplz44lhj6u4l6uhra",
+          "/game-client.js": "bafkreic6y74yidlzxx37uzspyd5hx7jitfucfncvxhzdfgt4rz2y5fcgwa",
+          "/prism-record.js": "bafkreies6pi3jehcffvkxnjrrterpfkqlunxvw3eyxlnxjfy6rhhd23el4"
+        },
+        "replacedAt": "2026-11-23T02:26:43.227Z"
+      }
+    ]
   }
 }
