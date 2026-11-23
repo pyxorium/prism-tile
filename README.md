@@ -4,8 +4,11 @@ A dice puzzle web tile: House Dice's Prism on its original 3 × 4 board. Its rul
 WebAssembly engine, `engine/engine.wasm`, which the tile's page plays through and which any host can
 use to check a saved game by replaying its moves.
 
-**Status:** stages 1 to 3 of 5: the engine, the tile's page, the lexicon and publishing. Raku's part (checking each
-game with the engine before saving it) comes next.
+**Status:** live since Nov 22 2026, published from thunderbird.cafe:
+`at://did:plc:6vxjigxrqizmbo56gojxico3/ing.dasl.masl/3n2ww7ntilcx6`.
+[Play it in Raku](https://raku.lexicographer.space/#t=at%3A%2F%2Fdid%3Aplc%3A6vxjigxrqizmbo56gojxico3%2Fing.dasl.masl%2F3n2ww7ntilcx6&a=0),
+which saves your games: before asking, it replays each game's moves in this engine (approved by its CID) and
+checks the score. The story behind it: [Prism: a dice puzzle that puts Wasm in a web tile](https://thunderbird.cafe/blog/prism-wasm-web-tile/).
 
 ## The engine
 
